@@ -18,15 +18,16 @@ LABEL maintainer="iYism <admin@iyism.com>"
 
 # Component versions
 ENV ZLIB_VERSION=1.3.1 \
-    PCRE2_VERSION=10.45 \
+    PCRE2_VERSION=10.46 \
     TONGSUO_VERSION=8.4.0 \
     GEOIP_VERSION=1.6.12 \
     BROTLI_VERSION=1.1.0 \
     NGX_BROTLI_VERSION=master \
     NGX_GEOIP2_VERSION=3.4 \
     NGX_DEVEL_KIT_VERSION=0.3.3 \
-    LUAJIT_VERSION=2.1-20250117 \
+    LUAJIT_VERSION=2.1-20250529 \
     ECHO_NGINX_VERSION=0.63 \
+    HEADERS_MORE_NGINX_VERSION=0.39 \
     LUA_NGINX_VERSION=0.10.28 \
     STREAM_LUA_NGINX_VERSION=0.0.16 \
     LUA_CJSON_VERSION=2.1.0.14 \
@@ -110,6 +111,10 @@ RUN set -x \
 # Download echo-nginx-module
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/echo-nginx-module/archive/refs/tags/v${ECHO_NGINX_VERSION}.tar.gz \
     && tar zxf echo-nginx-module-${ECHO_NGINX_VERSION}.tar.gz \
+    && cd ${BUILD_DIR} \
+# Download headers-more-nginx-module
+    && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/v${HEADERS_MORE_NGINX_VERSION}.tar.gz \
+    && tar zxf headers-more-nginx-module-${HEADERS_MORE_NGINX_VERSION}.tar.gz \
     && cd ${BUILD_DIR} \
 # Install luajit
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/luajit2/archive/refs/tags/v${LUAJIT_VERSION}.tar.gz \
@@ -217,6 +222,7 @@ RUN set -x \
         --add-module=modules/ngx_slab_stat \
         --add-module=${BUILD_DIR}/ngx_devel_kit-${NGX_DEVEL_KIT_VERSION} \
         --add-module=${BUILD_DIR}/echo-nginx-module-${ECHO_NGINX_VERSION} \
+        --add-module=${BUILD_DIR}/headers-more-nginx-module-${HEADERS_MORE_NGINX_VERSION} \
         --add-module=${BUILD_DIR}/ngx_http_geoip2_module-${NGX_GEOIP2_VERSION} \
         --add-module=${BUILD_DIR}/ngx_brotli-${NGX_BROTLI_VERSION} \
         --add-module=${BUILD_DIR}/lua-nginx-module-${LUA_NGINX_VERSION} \
