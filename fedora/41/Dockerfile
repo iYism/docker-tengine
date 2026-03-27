@@ -97,7 +97,7 @@ RUN set -x \
     && cd geoip-api-c-${GEOIP_VERSION} \
     && ./bootstrap \
     && ./configure --prefix=${HOME_DIR}/geoip \
-    && make \
+    && make > build.log 2>&1 || { cat build.log ; exit 1; } \
     && make install > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Download ngx_http_geoip2_module
@@ -120,8 +120,8 @@ RUN set -x \
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/luajit2/archive/refs/tags/v${LUAJIT_VERSION}.tar.gz \
     && tar zxf luajit2-${LUAJIT_VERSION}.tar.gz \
     && cd luajit2-${LUAJIT_VERSION} \
-    && make -j`nproc` XCFLAGS='-DLUAJIT_ENABLE_GC64' \
-    && make install PREFIX=${HOME_DIR}/luajit \
+    && make -j`nproc` XCFLAGS='-DLUAJIT_ENABLE_GC64' > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && make install PREFIX=${HOME_DIR}/luajit > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Download lua-nginx-module
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${LUA_NGINX_VERSION}.tar.gz \
