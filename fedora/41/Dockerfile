@@ -56,15 +56,15 @@ RUN set -x \
 # Mkdir basedir
     && mkdir -p ${LUA_LIB} ${LUA_MOD} \
 # Install development packages
-    && dnf install -y make gcc gcc-c++ perl diffutils autoconf automake libtool procps-ng \
-        gd-devel brotli-devel libxslt-devel libxml2-devel libmaxminddb-devel \
+    && dnf install -y make cmake gcc gcc-c++ perl diffutils autoconf automake libtool procps-ng \
+        gd-devel libxslt-devel libxml2-devel libmaxminddb-devel \
 # Install zlib
     && curl -LO --output-dir ${BUILD_DIR} https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz \
     && tar zxf zlib-${ZLIB_VERSION}.tar.gz \
     && cd zlib-${ZLIB_VERSION} \
     && ./configure --prefix=${HOME_DIR}/zlib \
-    && make -j`nproc` \
-    && make install \
+    && make -j`nproc` > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && make install > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Install pcre2
     && curl -LO --output-dir ${BUILD_DIR} https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE2_VERSION}/pcre2-${PCRE2_VERSION}.tar.gz \
@@ -74,8 +74,8 @@ RUN set -x \
         --enable-jit \
         --enable-pcre2-16 \
         --enable-pcre2-32 \
-    && make -j`nproc` \
-    && make install \
+    && make -j`nproc` > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && make install > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Download Tongsuo
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/Tongsuo-Project/Tongsuo/archive/refs/tags/${TONGSUO_VERSION}.tar.gz \
@@ -88,8 +88,8 @@ RUN set -x \
         -I${HOME_DIR}/zlib/include \
         -L${HOME_DIR}/zlib/lib \
         -Wl,-rpath,${HOME_DIR}/zlib/lib:${HOME_DIR}/Tongsuo/lib64 \
-    && make -j`nproc` \
-    && make install \
+    && make -j`nproc` > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && make install > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Install geoip-api-c
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/maxmind/geoip-api-c/archive/refs/tags/v${GEOIP_VERSION}.tar.gz \
@@ -98,7 +98,7 @@ RUN set -x \
     && ./bootstrap \
     && ./configure --prefix=${HOME_DIR}/geoip \
     && make \
-    && make install \
+    && make install > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Download ngx_http_geoip2_module
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/leev/ngx_http_geoip2_module/archive/refs/tags/${NGX_GEOIP2_VERSION}.tar.gz \
@@ -131,13 +131,21 @@ RUN set -x \
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/stream-lua-nginx-module/archive/refs/tags/v${STREAM_LUA_NGINX_VERSION}.tar.gz \
     && tar zxf stream-lua-nginx-module-${STREAM_LUA_NGINX_VERSION}.tar.gz \
     && cd ${BUILD_DIR} \
-# Download ngx_brotli
+# Install brotli && Unpack ngx_brotli, inject specific Brotli source into its deps
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/google/ngx_brotli/archive/refs/heads/${NGX_BROTLI_VERSION}.tar.gz \
     && tar zxf ngx_brotli-${NGX_BROTLI_VERSION}.tar.gz \
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/google/brotli/archive/refs/tags/v${BROTLI_VERSION}.tar.gz \
     && rm -fr ngx_brotli-${NGX_BROTLI_VERSION}/deps/brotli \
     && tar zxf brotli-${BROTLI_VERSION}.tar.gz -C ngx_brotli-${NGX_BROTLI_VERSION}/deps \
     && mv ngx_brotli-${NGX_BROTLI_VERSION}/deps/brotli-${BROTLI_VERSION} ngx_brotli-${NGX_BROTLI_VERSION}/deps/brotli \
+    && cd ngx_brotli-${NGX_BROTLI_VERSION}/deps/brotli \
+    && mkdir out && cd out \
+    && cmake -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=${HOME_DIR}/brotli \
+        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath,${HOME_DIR}/brotli/lib" \
+        -DCMAKE_INSTALL_LIBDIR=lib .. > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && cmake --build . --config Release --target install > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && cd ${BUILD_DIR} \
 # Install Tengine
     && if [ "${TENGINE_VERSION}" = "master" ]; then \
            curl -LJO --output-dir ${BUILD_DIR} https://github.com/alibaba/tengine/archive/refs/heads/${TENGINE_VERSION}.tar.gz; \
@@ -227,10 +235,10 @@ RUN set -x \
         --add-module=${BUILD_DIR}/ngx_brotli-${NGX_BROTLI_VERSION} \
         --add-module=${BUILD_DIR}/lua-nginx-module-${LUA_NGINX_VERSION} \
         --add-module=${BUILD_DIR}/stream-lua-nginx-module-${STREAM_LUA_NGINX_VERSION} \
-        --with-cc-opt="-fPIE -O2 -DNGX_LUA_ABORT_AT_PANIC -I${HOME_DIR}/zlib/include -I${HOME_DIR}/geoip/include -I${HOME_DIR}/pcre2/include -I${HOME_DIR}/Tongsuo/include" \
-        --with-ld-opt="-pie -Wl,-rpath,${HOME_DIR}/luajit/lib -L${HOME_DIR}/zlib/lib -L${HOME_DIR}/geoip/lib -L${HOME_DIR}/pcre2/lib -L${HOME_DIR}/Tongsuo/lib64 -Wl,-rpath,${HOME_DIR}/zlib/lib:${HOME_DIR}/geoip/lib:${HOME_DIR}/pcre2/lib:${HOME_DIR}/Tongsuo/lib64" \
-    && make -j`nproc` \
-    && make install \
+        --with-cc-opt="-fPIE -O2 -DNGX_LUA_ABORT_AT_PANIC -I${HOME_DIR}/zlib/include -I${HOME_DIR}/geoip/include -I${HOME_DIR}/pcre2/include -I${HOME_DIR}/Tongsuo/include -I${HOME_DIR}/brotli/include" \
+        --with-ld-opt="-pie -Wl,-rpath,${HOME_DIR}/luajit/lib -L${HOME_DIR}/zlib/lib -L${HOME_DIR}/geoip/lib -L${HOME_DIR}/pcre2/lib -L${HOME_DIR}/Tongsuo/lib64 -L${HOME_DIR}/brotli/lib -Wl,-rpath,${HOME_DIR}/zlib/lib:${HOME_DIR}/geoip/lib:${HOME_DIR}/pcre2/lib:${HOME_DIR}/Tongsuo/lib64:${HOME_DIR}/brotli/lib" \
+    && make -j`nproc` > build.log 2>&1 || { cat build.log ; exit 1; } \
+    && make install > build.log 2>&1 || { cat build.log ; exit 1; } \
     && cd ${BUILD_DIR} \
 # Install lua-resty-core
     && curl -LJO --output-dir ${BUILD_DIR} https://github.com/openresty/lua-resty-core/archive/refs/tags/v${RESTY_CORE_VERSION}.tar.gz \
@@ -300,7 +308,7 @@ RUN set -x \
 # Create the directories required for Tengine dependencies
     && mkdir -p ${DATA_DIR} ${LOGS_DIR} \
 # Install required packages
-    && dnf install -y findutils gd brotli libxslt libxml2 libmaxminddb \
+    && dnf install -y findutils gd libxslt libxml2 libmaxminddb \
     && dnf clean all
 
 # Add Lua paths
